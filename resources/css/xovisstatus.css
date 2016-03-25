@@ -1,0 +1,16 @@
+.container {
+  padding: 15px 20px;
+}
+
+body {
+  font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+@media (min-width: 550px) {
+  h1 { font-size: 5.0rem; text-align: center; }
+}
+
+.alignright {
+  float: right;
+}
+
