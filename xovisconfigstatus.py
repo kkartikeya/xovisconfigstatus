@@ -1,76 +1,101 @@
-import urllib2, base64
-import xml.etree.ElementTree as ET
-import ConfigParser
+import psycopg2
 import subprocess
+import datetime
 
-class FakeSecHead(object):
-    def __init__(self, fp):
-        self.fp = fp
-        self.sechead = '[asection]\n'
+# Xovis Database Info
+DB_HOST='localhost'
+DB_NAME='xovis'
+DB_USER='xovis'
+DB_PASS='xovis'
 
-    def readline(self):
-        if self.sechead:
-            try: 
-                return self.sechead
-            finally: 
-                self.sechead = None
-        else: 
-            return self.fp.readline()
+def connect():
+  conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
+  cursor = conn.cursor()
+  return cursor, conn
 
-def parseProperties(propertiesFile):
-	config = ConfigParser.SafeConfigParser()
-	config.readfp( FakeSecHead(open(propertiesFile )))
+def getCamInfo():
+	getCamInfoQuery='select macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, ' \
+					'registered, alive, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, '\
+					'cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus from xovis_status order by sensorgroup, sensorname'
 
-	username = config.get("asection", "webgui.user")
-	password = config.get("asection", "webgui.passwd")
+	cursor, conn = connect()
+	cursor.execute( getCamInfoQuery )
+	
+	rows=cursor.fetchall()
 
-	return username, password
+	return rows
 
-def fetchSensorsXML(ipaddress, username, password):
-	''' Get the Sensor List '''
-	request = urllib2.Request("http://%s/sensors" % (ipaddress))
-	base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
-	request.add_header("Authorization", "Basic %s" % base64string)
-	sensorsXML = urllib2.urlopen(request, timeout=60).read()
+epoch = datetime.datetime.utcfromtimestamp(0)
 
-	return sensorsXML
+def unix_time_millis(dt):
+    return (dt - epoch).total_seconds() * 1000
 
-def parseSensorsXML(ipaddress, sensorsXML, username, password):
+def current_time_millis():
+	current = datetime.datetime.utcnow()
+	return int(unix_time_millis( current ))
+
+def getLastSeenText(lastseen):
+	currenttime=current_time_millis()
+	when=currenttime-lastseen
+	return str(when/1000)+' secs ago'
+
+def generatehtmlSnippet():
 	htmlSnippet = ""
-	xmlRoot = ET.fromstring(sensorsXML)
-	base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
-	for child in xmlRoot:
-		if child.tag == 'sensor':
-			serial = child.find('serial').text
-			ip = child.find('ip').text
-			group = child.find('group').text
-			name = child.find('name').text
-			devicetype = child.find('device-type').text
-			swversion = child.find('sw-version').text
-			registered = child.find('registered').text
-			alive = child.find('alive').text
-			connected = child.find('connected').text
 
-			if connected == 'true':
-				htmlSnippet += str("\n<tr>\n<td><img src=\"resources/images/green_dot.png\" alt=\"Connected\"></td>" )
+	rows=getCamInfo()
+	for row in rows:
+		macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, registered, alive, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = row
+
+		if connected:
+			htmlSnippet += str('\n<tr>\n<td><img src="resources/images/green_dot.png" alt="Connected" /></td>' )
+		else:
+			htmlSnippet += str('\n<tr>\n<td><img src="resources/images/red_dot.png" alt="Not Connected" /></td>' )
+
+		htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>' % (sensorgroup, sensorname))
+
+		htmlSnippet += str('\n<td>%s</td>\n' % (getLastSeenText(lastseen)))
+		htmlSnippet += str('\n<td><a href="/sensors/%s/" target="_blank">%s</a></td>' % (macaddress, macaddress))
+		htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n<td>%s</td>' % (ipaddress, devicetype, firmware))
+
+		if connected:
+			htmlSnippet += str('\n<td>%s</td>' % (timezone))
+
+			if ntpenabled:
+				htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" checked /></td>')
+				if ntpstatus:
+					htmlSnippet += str('\n<td><img src="resources/images/green_dot.png" alt="Success" /></td>' )
+				else:
+					htmlSnippet += str('\n<td><img src="resources/images/red_dot.png" alt="Fail" /></td>' )
 			else:
-				htmlSnippet += str("\n<tr>\n<td><img src=\"resources/images/red_dot.png\" alt=\"Not Connected\"></td>" )
+				htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" unchecked /></td>\n<td></td>')
+			
+			htmlSnippet += str("\n<td>%s</td>\n<td>%s</td>" % (countmode, coordinatemode))
 
-			htmlSnippet += str("\n<td>%s</td>\n<td>%s</td>" % (group, name))
-			htmlSnippet += str("\n<td><a href=\"/sensors/%s/\" target=\"_blank\">%s</a></td>" % (serial, serial))
-			htmlSnippet += str("\n<td>%s</td>\n<td>%s</td>\n<td>%s</td>" % (ip, devicetype, swversion))
-
-			if alive == 'true' and connected == 'true':
-				request1 = urllib2.Request("http://%s/sensors/%s/api/config" % (ipaddress, serial))
-				request1.add_header("Authorization", "Basic %s" % base64string)
-
-				settingsXML = urllib2.urlopen(request1, timeout=60).read()
-
-				settings = ET.fromstring(settingsXML)
-				htmlSnippet += str("\n<td>%s</td>" % (settings.find('sensor').find('timezone').text))
-				htmlSnippet += str("\n<td>%s</td>\n<td>%s</td>\n</tr>" % (settings.find('analytics').find('settings').find('cntmode').text, settings.find('analytics').find('settings').find('coordinatemode').text))
+			if onpremenabled:
+				htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" checked /></td>')
+				if onprempushstatus:
+					htmlSnippet += str('\n<td><img src="resources/images/green_dot.png" alt="Success" /></td>' )
+				else:
+					htmlSnippet += str('\n<td><img src="resources/images/red_dot.png" alt="Fail" /></td>' )
 			else:
-				htmlSnippet += str("\n<td></td>\n<td></td>\n</tr>")
+				htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" unchecked /></td>\n<td></td>')
+
+			if cloudenabled:
+				htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" checked /></td>')
+
+				if cloudcountpushstatus:
+					htmlSnippet += str('\n<td><img src="resources/images/green_dot.png" alt="Success" /></td>' )
+				else:
+					htmlSnippet += str('\n<td><img src="resources/images/red_dot.png" alt="Fail" /></td>' )
+
+				if cloudsensorpushstatus:
+					htmlSnippet += str('\n<td><img src="resources/images/green_dot.png" alt="Success" /></td>' )
+				else:
+					htmlSnippet += str('\n<td><img src="resources/images/red_dot.png" alt="Fail" /></td>' )
+			else:
+				htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" unchecked /></td>\n<td></td>\n<td></td>\n</tr>')
+		else:
+			htmlSnippet += str('\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n</tr>')
 	return htmlSnippet
 
 def createIndexHTML(htmlSnippet):
@@ -83,11 +108,8 @@ def createIndexHTML(htmlSnippet):
 		
 
 def main():
-	username, password = parseProperties("/opt/xovis3/xovis_remote_manager.properties")
-	sensorsXML = fetchSensorsXML("localhost:8080", username, password);
-	htmlSnippet = parseSensorsXML( "localhost:8080", sensorsXML, username, password )
+	htmlSnippet = generatehtmlSnippet()
 	createIndexHTML(htmlSnippet)
-
 
 if __name__ == "__main__":
 	main()
