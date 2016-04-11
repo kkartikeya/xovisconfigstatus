@@ -2,7 +2,7 @@
 
 if [ ! -f /usr/bin/psql ];  then 
     echo "Postgres is not installed, Installing..."
-    yum -y install postgresql92-server
+    yum -y install postgresql92-server postgresql92-devel gcc
     /sbin/service postgresql92 initdb
     /sbin/service postgresql92 restart
     su postgres -c "/usr/bin/psql -U postgres -c \"alter user postgres password 'postgres'\"" >/dev/null
@@ -29,6 +29,8 @@ fi
 
 /usr/bin/psql -Upostgres -f CreateDatabase.sql
 
+# Install python postgres package
+pip install psycopg2
 
 # Create /var/www/status directory
 mkdir -p /var/www/status
