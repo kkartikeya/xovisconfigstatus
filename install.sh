@@ -47,9 +47,9 @@ crontab -l > mycron
 /usr/bin/psql -Upostgres -f CreateDatabase.sql
 
 # Add config status to the crontab dump file
-echo "*/5 * * * * cd xovisconfigstatus; python xoviscameralist.py" >> mycron
-echo "3 * * * * cd xovisconfigstatus; python xoviscamconfig.py" >> mycron
-echo "*/8 * * * * cd xovisconfigstatus; python xovisconfigstatus.py" >> mycron
+echo "*/5 * * * * cd /opt/xovisconfigstatus; python xoviscameralist.py" >> mycron
+echo "3 * * * * cd /opt/xovisconfigstatus; python xoviscamconfig.py" >> mycron
+echo "*/8 * * * * cd /opt/xovisconfigstatus; python xovisconfigstatus.py" >> mycron
 
 # Add the entire crontab back
 crontab mycron
