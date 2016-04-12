@@ -136,21 +136,16 @@ def getCamStatus( macaddress ):
 					lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
 					onprempushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
 
-				if "retailops" in agent and "countdata" in agent:
+				if "retailops" in agent:
+					cloudenabled='true'
 					if "countdata" in agent:
-						cloudenabled='true'
 						lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
 						lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
-						cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
-								
-					elif "status" in agent:
+						cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)								
+					if "status" in agent:
 						lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
 						lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
 						cloudsensorpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
-				else:
-					cloudenabled='false'
-					cloudcountpushstatus='false'
-					cloudsensorpushstatus='false'
 
 			for ntpstatus in status.findall('{http://www.xovis.com/status}ntp-status'):
 				ntpenabled=getElementValue(ntpstatus.find('{http://www.xovis.com/status}active'))
@@ -191,7 +186,6 @@ def persistToDb( rows ):
 
 	commit( conn )
 	cursor.close();
-
 
 def persistToCSV( rows, filename ):
 	with open(filename, 'wb') as csvfile:
