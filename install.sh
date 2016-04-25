@@ -34,7 +34,7 @@ fi
 pip install --upgrade pip
 
 # Install python postgres package
-pip install psycopg2
+/usr/local/bin/pip install psycopg2
 
 # Create /var/www/status directory
 mkdir -p /var/www/status
