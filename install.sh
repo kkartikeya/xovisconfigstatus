@@ -27,10 +27,14 @@ fi
 
 /sbin/service postgresql92 restart
 
+# Create Xovis config database
 /usr/bin/psql -Upostgres -f CreateDatabase.sql
 
+# Upgrade pip
+pip install --upgrade pip
+
 # Install python postgres package
-pip install psycopg2
+/usr/local/bin/pip install psycopg2
 
 # Create /var/www/status directory
 mkdir -p /var/www/status
@@ -44,11 +48,9 @@ chmod -R 755 /var/www/status
 # Dump crontab to a file
 crontab -l > mycron
 
-/usr/bin/psql -Upostgres -f CreateDatabase.sql
-
 # Add config status to the crontab dump file
-echo "0, 15, 30, 45 * * * * cd /opt/xovisconfigstatus; python xoviscameralist.py" >> mycron
-echo "6, 21, 36, 51 * * * * cd /opt/xovisconfigstatus; python xoviscamconfig.py" >> mycron
+echo "0,15,30,45 * * * * cd /opt/xovisconfigstatus; python xoviscameralist.py" >> mycron
+echo "6,21,36,51 * * * * cd /opt/xovisconfigstatus; python xoviscamconfig.py" >> mycron
 echo "*/5 * * * * cd /opt/xovisconfigstatus; python xovisconfigstatus.py" >> mycron
 
 # Add the entire crontab back
