@@ -46,7 +46,7 @@ def generatehtmlSnippet():
     for row in rows:
         macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, registered, alive, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = row
 
-        if connected:
+        if alive:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/green_dot.png" alt="Connected" /></td>' )
         else:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/red_dot.png" alt="Not Connected" /></td>' )
