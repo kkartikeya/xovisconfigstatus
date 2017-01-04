@@ -1,7 +1,6 @@
 import ConfigParser
 import urllib2, base64
 import xml.etree.ElementTree as ET
-from xml.etree.ElementTree import ParseError
 import psycopg2
 import socket
 
@@ -26,9 +25,9 @@ class FakeSecHead(object):
             return self.fp.readline()
 
 def connect():
-  conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
-  cursor = conn.cursor()
-  return cursor, conn
+    conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
+    cursor = conn.cursor()
+    return cursor, conn
 
 def commit( conn ):
 	conn.commit();
@@ -66,18 +65,18 @@ def getCamConfig(ipaddress, username, password):
 			globalcountmode=config.find('analytics').find('settings').find('cntmode').text
 			coordinatemode=config.find('analytics').find('settings').find('coordinatemode').text
 
-            try:
-                countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
-                if countlinecountmode != None:
-                    globalcountmode=countlinecountmode
-            except AttributeError:
-                print("Older Version or Slave Camera")
+			try:
+                            countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
+                            if countlinecountmode != None:
+                                globalcountmode=countlinecountmode
+                        except AttributeError:
+                            print("Older Version or Slave Camera")
 
 			cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
 		except socket.timeout:
-			print('Socket Timeout exception for %s' % macaddress)
-        except ET.ParseError as err:
-            print('Parsing Error')
+		    print('Socket Timeout exception for %s' % macaddress)
+                except ET.ParseError as err:
+                    print('Parsing Error')
 
 	commit(conn)
 	cursor.close()
