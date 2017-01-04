@@ -11,81 +11,81 @@ DB_USER='xovis'
 DB_PASS='xovis'
 
 class FakeSecHead(object):
-    def __init__(self, fp):
-        self.fp = fp
-        self.sechead = '[asection]\n'
+        def __init__(self, fp):
+                self.fp = fp
+                self.sechead = '[asection]\n'
 
-    def readline(self):
-        if self.sechead:
-            try:
-                return self.sechead
-            finally:
-                self.sechead = None
-        else:
-            return self.fp.readline()
+        def readline(self):
+                if self.sechead:
+                        try:
+                                return self.sechead
+                        finally:
+                                self.sechead = None
+                else:
+                        return self.fp.readline()
 
 def connect():
-    conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
-    cursor = conn.cursor()
-    return cursor, conn
+        conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
+        cursor = conn.cursor()
+        return cursor, conn
 
 def commit( conn ):
-	conn.commit();
+    conn.commit();
 
 def rollback():
-	conn.rollback();
+    conn.rollback();
 
 def parseProperties(propertiesFile):
-	config = ConfigParser.SafeConfigParser()
-	config.readfp( FakeSecHead(open(propertiesFile )))
+    config = ConfigParser.SafeConfigParser()
+    config.readfp( FakeSecHead(open(propertiesFile )))
 
-	username = config.get("asection", "webgui.user")
-	password = config.get("asection", "webgui.passwd")
+    username = config.get("asection", "webgui.user")
+    password = config.get("asection", "webgui.passwd")
 
-	return username, password
+    return username, password
 
 def getCamConfig(ipaddress, username, password):
-	cursor, conn = connect()
-	base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
+    cursor, conn = connect()
+    base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
 
-	getCamListQuery="select macaddress from xovis_status where alive = true"
-	cursor.execute( getCamListQuery )
+    getCamListQuery="select macaddress from xovis_status where alive = true"
+    cursor.execute( getCamListQuery )
 
-	rows = cursor.fetchall()
-	for row in rows:
-		macaddress=row[0]
+    rows = cursor.fetchall()
+    for row in rows:
+        macaddress=row[0]
 
-		httprequest = urllib2.Request('http://%s/sensors/%s/api/config' % (ipaddress, macaddress))
-		httprequest.add_header("Authorization", "Basic %s" % base64string)
+        httprequest = urllib2.Request('http://%s/sensors/%s/api/config' % (ipaddress, macaddress))
+        httprequest.add_header("Authorization", "Basic %s" % base64string)
 
-		try:
-			configXML = urllib2.urlopen(httprequest, timeout=60).read()
-			config = ET.fromstring(configXML)
-			timezone=config.find('sensor').find('timezone').text
-			globalcountmode=config.find('analytics').find('settings').find('cntmode').text
-			coordinatemode=config.find('analytics').find('settings').find('coordinatemode').text
+        try:
+            configXML = urllib2.urlopen(httprequest, timeout=60).read()
+            config = ET.fromstring(configXML)
+            timezone=config.find('sensor').find('timezone').text
+            globalcountmode=config.find('analytics').find('settings').find('cntmode').text
+            coordinatemode=config.find('analytics').find('settings').find('coordinatemode').text
 
-			try:
-                            countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
-                            if countlinecountmode != None:
-                                globalcountmode=countlinecountmode
-                        except AttributeError:
-                            print("Older Version or Slave Camera")
+            try:
+                    countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
+                    if countlinecountmode != None:
+                            globalcountmode=countlinecountmode
+             except AttributeError:
+                     print("Older Version or Slave Camera")
 
-			cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
-		except socket.timeout:
-		    print('Socket Timeout exception for %s' % macaddress)
-                except ET.ParseError as err:
-                    print('Parsing Error')
+            cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
+        except socket.timeout:
+                print('Socket Timeout exception for %s' % macaddress)
+        except ET.ParseError as err:
+                print('Parsing Error')
 
-	commit(conn)
-	cursor.close()
+    commit(conn)
+    cursor.close()
 
 def main():
-	username, password = parseProperties("/opt/xovis/xovis_remote_manager.properties")
-	ipaddress='localhost'
-	getCamConfig(ipaddress+':8080', username, password)
+    username, password = parseProperties("/opt/xovis/xovis_remote_manager.properties")
+    ipaddress='localhost'
+    getCamConfig(ipaddress+':8080', username, password)
 
 
 if __name__ == "__main__":
-	main()
+    main()

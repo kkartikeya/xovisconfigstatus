@@ -20,13 +20,13 @@ class FakeSecHead(object):
             return self.fp.readline()
 
 def parseProperties(propertiesFile):
-	config = ConfigParser.SafeConfigParser()
-	config.readfp( FakeSecHead(open(propertiesFile )))
+    config = ConfigParser.SafeConfigParser()
+    config.readfp( FakeSecHead(open(propertiesFile )))
 
-	username = config.get("asection", "webgui.user")
-	password = config.get("asection", "webgui.passwd")
+    username = config.get("asection", "webgui.user")
+    password = config.get("asection", "webgui.passwd")
 
-	return username, password
+    return username, password
 
 def fetchSensorsXML(ipaddress, username, password):
     base64string=base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
@@ -38,16 +38,16 @@ def fetchSensorsXML(ipaddress, username, password):
     return sensorsXML
 
 def parseSensorsXML(sensorsXML):
-	rows = []
-	xmlRoot = ET.fromstring(sensorsXML)
-	for child in xmlRoot:
-		if child.tag == 'sensor':
-			serial = child.find('serial').text
-			ip = child.find('ip').text
-			group = child.find('group').text
-			name = child.find('name').text
-			rows.append([serial, group, name, ip])
-	return rows
+    rows = []
+    xmlRoot = ET.fromstring(sensorsXML)
+    for child in xmlRoot:
+        if child.tag == 'sensor':
+            serial = child.find('serial').text
+            ip = child.find('ip').text
+            group = child.find('group').text
+            name = child.find('name').text
+            rows.append([serial, group, name, ip])
+    return rows
 
 def getCamSnapshot(rows, ipaddress, username, password, passwd):
     base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
@@ -96,4 +96,4 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+    main()
