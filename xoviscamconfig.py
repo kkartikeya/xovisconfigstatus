@@ -1,6 +1,7 @@
 import ConfigParser
 import urllib2, base64
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import ParseError
 import psycopg2
 import socket
 
@@ -17,11 +18,11 @@ class FakeSecHead(object):
 
     def readline(self):
         if self.sechead:
-            try: 
+            try:
                 return self.sechead
-            finally: 
+            finally:
                 self.sechead = None
-        else: 
+        else:
             return self.fp.readline()
 
 def connect():
@@ -62,17 +63,27 @@ def getCamConfig(ipaddress, username, password):
 			configXML = urllib2.urlopen(httprequest, timeout=60).read()
 			config = ET.fromstring(configXML)
 			timezone=config.find('sensor').find('timezone').text
-			countmode=config.find('analytics').find('settings').find('cntmode').text
+			globalcountmode=config.find('analytics').find('settings').find('cntmode').text
 			coordinatemode=config.find('analytics').find('settings').find('coordinatemode').text
 
-			cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, countmode, coordinatemode, configXML, macaddress))
+            try:
+                countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
+                if countlinecountmode != None:
+                    globalcountmode=countlinecountmode
+            except AttributeError:
+                print("Older Version or Slave Camera")
+
+			cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
 		except socket.timeout:
 			print('Socket Timeout exception for %s' % macaddress)
+        except ET.ParseError as err:
+            print('Parsing Error')
+
 	commit(conn)
 	cursor.close()
 
 def main():
-	username, password = parseProperties("/opt/xovis3/xovis_remote_manager.properties")
+	username, password = parseProperties("/opt/xovis/xovis_remote_manager.properties")
 	ipaddress='localhost'
 	getCamConfig(ipaddress+':8080', username, password)
 

@@ -86,7 +86,7 @@ def main():
     else:
         passwd='pass'
 
-    username, password = parseProperties("/opt/xovis3/xovis_remote_manager.properties")
+    username, password = parseProperties("/opt/xovis/xovis_remote_manager.properties")
     ipaddress='localhost:8080'
 
     sensorXML=fetchSensorsXML(ipaddress, username, password)

@@ -21,11 +21,11 @@ class FakeSecHead(object):
 
     def readline(self):
         if self.sechead:
-            try: 
+            try:
                 return self.sechead
-            finally: 
+            finally:
                 self.sechead = None
-        else: 
+        else:
             return self.fp.readline()
 
 def parseProperties(propertiesFile):
@@ -36,8 +36,8 @@ def parseProperties(propertiesFile):
 	password = config.get("asection", "webgui.passwd")
 
 	return username, password
-    
-username, password = parseProperties("/opt/xovis3/xovis_remote_manager.properties")
+
+username, password = parseProperties("/opt/xovis/xovis_remote_manager.properties")
 ipaddress = 'localhost'
 base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
 epoch = datetime.datetime.utcfromtimestamp(0)
@@ -69,7 +69,7 @@ def fetchSensorsXML(ipaddress, username, password):
 	return sensorsXML
 
 def parseSensorsXML(sensorsXML):
-	rows = []	
+	rows = []
 	xmlRoot = ET.fromstring(sensorsXML)
 	for child in xmlRoot:
 		if child.tag == 'sensor':
@@ -103,7 +103,7 @@ def getStatus( lastsuccessfulText, lastunsuccessfulText):
 		lastunsuccessful=dateparser.parse(lastunsuccessfulText)
 
 	if lastsuccessful is not None and lastunsuccessful is not None:
-		if lastsuccessful>lastunsuccessful:	
+		if lastsuccessful>lastunsuccessful:
 			status='true'
 		else:
 			status='false'
@@ -117,14 +117,14 @@ def getStatus( lastsuccessfulText, lastunsuccessfulText):
 def getCamStatus( macaddress ):
 	onpremenabled=onprempushstatus=cloudenabled=cloudcountpushstatus=cloudsensorpushstatus=ntpenabled=ntpstatus='false'
 
-	try: 
+	try:
 		httprequest=urllib2.Request('http://%s/sensors/%s/api/info/status' % (ipaddress, macaddress))
 		httprequest.add_header("Authorization", "Basic %s" % base64string)
 
 		statusXML = urllib2.urlopen(httprequest, timeout=60).read()
 		try:
 			status = ET.fromstring(statusXML)
-		
+
 			datapushstatus = status.find('{http://www.xovis.com/status}data-push-status')
 
 			for agentstatus in datapushstatus.findall('{http://www.xovis.com/status}agent-status'):
@@ -141,7 +141,7 @@ def getCamStatus( macaddress ):
 					if "countdata" in agent:
 						lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
 						lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
-						cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)								
+						cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
 					if "status" in agent:
 						lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
 						lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
@@ -174,7 +174,7 @@ def persistToDb( rows ):
 
 		if alive == 'true':
 			onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatus(serial)
-			if not records: 
+			if not records:
 				cursor.execute( "insert into xovis_status(macaddress, sensorgroup, sensorname, lastseen, ipaddress, devicetype, firmware, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) " , ( serial, group, name, curr, ip, devicetype, swversion, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus ) )
 			else:
 				cursor.execute( "update xovis_status set sensorgroup = %s, sensorname = %s, lastseen = %s, ipaddress = %s, devicetype = %s, firmware = %s, registered = %s, alive = %s, connected = %s, onpremenabled = %s, onprempushstatus = %s, cloudenabled = %s, cloudcountpushstatus = %s, cloudsensorpushstatus = %s, ntpenabled = %s, ntpstatus = %s where macaddress = %s " , ( group, name, curr, ip, devicetype, swversion, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus, serial ) )
