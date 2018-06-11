@@ -2,7 +2,9 @@ import ConfigParser
 import urllib2, base64
 import xml.etree.ElementTree as ET
 import psycopg2
+import requests
 import socket
+import json
 
 # Xovis Database Info
 DB_HOST='localhost'
@@ -11,7 +13,7 @@ DB_USER='xovis'
 DB_PASS='xovis'
 
 # Slack URL
-URL=""
+URL="https://hooks.slack.com/services/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"
 
 def sendSlackMessage( message ):
     if message <> '':
@@ -81,20 +83,20 @@ def getCamConfig(ipaddress, username, password):
             coordinatemode=config.find('analytics').find('settings').find('coordinatemode').text
 
             try:
-                    countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
-                    if countlinecountmode != None:
-                            globalcountmode=countlinecountmode
-             except AttributeError:
-                     print("Older Version or Slave Camera")
+                countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
+                if countlinecountmode != None:
+                    globalcountmode=countlinecountmode
+            except AttributeError:
+                print("Older Version or Slave Camera")
 
             if globalcountmode <> 'LATE':
                 sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
 
             cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
         except socket.timeout:
-                print('Socket Timeout exception for %s' % macaddress)
+            print('Socket Timeout exception for %s' % macaddress)
         except ET.ParseError as err:
-                print('Parsing Error')
+            print('Parsing Error')
 
     commit(conn)
     cursor.close()
