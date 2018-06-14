@@ -80,7 +80,7 @@ def getCamConfig(ipaddress, username, password):
             config = ET.fromstring(configXML)
 
             #Get timezone from the config
-            timezone=config.find('sensor').find('timezone').
+            timezone=config.find('sensor').find('timezone').text
 
             #Get Count Mode from the globel config setting, for older version of xovis, the count mode was saved per camera basisself.
             #on the newer version, the count mode is saved as a per count line.
@@ -98,8 +98,8 @@ def getCamConfig(ipaddress, username, password):
             if globalcountmode <> 'LATE':
                 sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
 
-            agents = config.find('{http://www.xovis.com/config}datapush')
-            for agent in agents.findall('{http://www.xovis.com/config}agent'):
+            agents = config.find('datapush')
+            for agent in agents.findall('agent'):
                 url=agent.find('connector').find('url').text
                 if "datafeed" in url:
                     onpremagentid=agent.attrib.get('id').text
