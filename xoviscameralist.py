@@ -114,7 +114,7 @@ def getStatus( lastsuccessfulText, lastunsuccessfulText):
 
     return status
 
-def getCamStatus( macaddress ):
+def getCamStatusCompatibilityMode(macaddress):
     onpremenabled=onprempushstatus=cloudenabled=cloudcountpushstatus=cloudsensorpushstatus=ntpenabled=ntpstatus='false'
 
     try:
@@ -127,25 +127,26 @@ def getCamStatus( macaddress ):
 
             datapushstatus = status.find('{http://www.xovis.com/status}data-push-status')
 
-            for agentstatus in datapushstatus.findall('{http://www.xovis.com/status}agent-status'):
-                agent=agentstatus.find('{http://www.xovis.com/status}agent').text
+            if datapushstatus!=None:
+                for agentstatus in datapushstatus.findall('{http://www.xovis.com/status}agent-status'):
+                    agent=agentstatus.find('{http://www.xovis.com/status}agent').text
 
-                if "datafeed" in agent:
-                    onpremenabled='true'
-                    lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
-                    lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
-                    onprempushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
-
-                if "retailops" in agent:
-                    cloudenabled='true'
-                    if "countdata" in agent:
+                    if "datafeed" in agent:
+                        onpremenabled='true'
                         lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
                         lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
-                        cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
-                    if "status" in agent:
-                        lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
-                        lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
-                        cloudsensorpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+                        onprempushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+
+                    if "retailops" in agent:
+                        cloudenabled='true'
+                        if "countdata" in agent:
+                            lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
+                            lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
+                            cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+                        if "status" in agent:
+                            lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
+                            lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
+                            cloudsensorpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
 
             for ntpstatus in status.findall('{http://www.xovis.com/status}ntp-status'):
                 ntpenabled=getElementValue(ntpstatus.find('{http://www.xovis.com/status}active'))
@@ -161,6 +162,19 @@ def getCamStatus( macaddress ):
 
     return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
 
+def getCamStatus(macaddress):
+    onpremenabled=onprempushstatus=cloudenabled=cloudcountpushstatus=cloudsensorpushstatus=ntpenabled=ntpstatus='false'
+    
+    return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
+
+def getCamStatusByVersion(macaddress, firmware):
+    if firmware >= '3.5.2':
+        onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatusCompatibilityMode(macaddress)
+    else
+        onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatus(macaddress)
+
+    return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
+
 def persistToDb( rows ):
     cursor, conn = connect()
     curr=current_time_millis()
@@ -168,12 +182,12 @@ def persistToDb( rows ):
     for row in rows:
         serial, group, name, ip, devicetype, swversion, registered, alive, connected = row
 
-        checkCamExist="select * from xovis_status where macaddress = '%s' " % ( serial )
+        checkCamExist="select macaddress from xovis_status where macaddress = '%s' " % ( serial )
         cursor.execute( checkCamExist )
         records = cursor.fetchall()
 
         if alive == 'true':
-            onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatus(serial)
+            onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatusByVersion(serial,swversion)
             if not records:
                 cursor.execute( "insert into xovis_status(macaddress, sensorgroup, sensorname, lastseen, ipaddress, devicetype, firmware, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) " , ( serial, group, name, curr, ip, devicetype, swversion, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus ) )
             else:

@@ -101,29 +101,30 @@ def getCamConfig(ipaddress, username, password):
                 sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
 
             agents = config.find('datapush')
-            for agent in agents.findall('agent'):
-                connector=agent.find('connector')
-                if connector!=None:
-                    urlobject=connector.find('url')
-                    if urlobject!=None:
-                        url=urlobject.text
-                        if "datafeed" in url:
-                            onpremagentid=agent.attrib.get('id')
+            if agents!=None:
+                for agent in agents.findall('agent'):
+                    connector=agent.find('connector')
+                    if connector!=None:
+                        urlobject=connector.find('url')
+                        if urlobject!=None:
+                            url=urlobject.text
+                            if "datafeed" in url:
+                                onpremagentid=agent.attrib.get('id')
 
-                        if "retailops" in url:
-                            type=agent.attrib.get('type')
-                            id=agent.attrib.get('id')
-                            if "countdata" in type:
-                                cloudcountagentid=id
+                            if "retailops" in url:
+                                type=agent.attrib.get('type')
+                                id=agent.attrib.get('id')
+                                if "countdata" in type:
+                                    cloudcountagentid=id
 
-                            if "status" in type:
-                                cloudsensorstatusagentid=id
+                                if "status" in type:
+                                    cloudsensorstatusagentid=id
 
             cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, onpremagentid=%s, cloudcountagentid=%s, cloudsensorstatusagentid=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, onpremagentid, cloudcountagentid, cloudsensorstatusagentid, configXML, macaddress))
         except socket.timeout:
             print('Socket Timeout exception for %s' % macaddress)
         except ET.ParseError as err:
-            print('Parsing Error')
+            print('Parsing Error for %s' % macaddress)
 
     commit(conn)
     cursor.close()
