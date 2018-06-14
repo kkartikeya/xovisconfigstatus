@@ -79,6 +79,8 @@ def getCamConfig(ipaddress, username, password):
             configXML = urllib2.urlopen(httprequest, timeout=60).read()
             config = ET.fromstring(configXML)
 
+            onpremagentid=cloudcountagentid=cloudsensorstatusagentid=-1
+
             #Get timezone from the config
             timezone=config.find('sensor').find('timezone').text
 
