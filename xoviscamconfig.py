@@ -65,7 +65,7 @@ def getCamConfig(ipaddress, username, password):
     cursor, conn = connect()
     base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
 
-    getCamListQuery="select macaddress from xovis_status where alive = true"
+    getCamListQuery="select macaddress, sensorgroup, sensorname from xovis_status where alive = true"
     cursor.execute( getCamListQuery )
 
     rows = cursor.fetchall()
@@ -88,6 +88,9 @@ def getCamConfig(ipaddress, username, password):
                     globalcountmode=countlinecountmode
             except AttributeError:
                 print("Older Version or Slave Camera")
+
+            if globalcountmode <> 'LATE':
+                sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
 
             cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
         except socket.timeout:
