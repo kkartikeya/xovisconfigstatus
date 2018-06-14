@@ -105,11 +105,13 @@ def getCamConfig(ipaddress, username, password):
                     onpremagentid=agent.attrib.get('id')
 
                 if "retailops" in url:
-                    if "countdata" in agent.attrib.get('type')
-                        cloudcountagentid=agent.attrib.get('id')
+                    type=agent.attrib.get('type')
+                    id=agent.attrib.get('id')
+                    if "countdata" in type:
+                        cloudcountagentid=id
 
-                    if "status" in agent.attrib.get('type'):
-                        cloudsensorstatusagentid=agent.attrib.get('id')
+                    if "status" in type:
+                        cloudsensorstatusagentid=id
 
             cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, onpremagentid=%s, cloudcountagentid=%s, cloudsensorstatusagentid=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, onpremagentid, cloudcountagentid, cloudsensorstatusagentid, configXML, macaddress))
         except socket.timeout:
