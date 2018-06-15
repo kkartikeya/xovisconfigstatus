@@ -16,7 +16,7 @@ def connect():
 def getCamInfo():
     getCamInfoQuery='select macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, ' \
                     'registered, alive, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, '\
-                    'cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus from xovis_status order by sensorgroup, sensorname'
+                    'cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus from xovis_status order by sensorgroup asc, sensorname asc, ipaddress asc, lastseen desc'
 
     cursor, conn = connect()
     cursor.execute( getCamInfoQuery )
