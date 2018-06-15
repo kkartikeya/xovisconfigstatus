@@ -221,7 +221,7 @@ def getCamStatus(macaddress):
     return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
 
 def getCamStatusByVersion(macaddress, firmware):
-    if firmware >= '3.5.2':
+    if firmware >= '3.5.3':
         onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatus(macaddress)
     else:
         onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatusCompatibilityMode(macaddress)
