@@ -195,7 +195,7 @@ def getCamStatus(macaddress):
                             lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
                             onprempushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
 
-                        if id == cloudcountagentid || id == cloudsensorstatusagentid:
+                        if id == cloudcountagentid or id == cloudsensorstatusagentid:
                             cloudenabled='true'
                             if id == cloudcountagentid:
                                 lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
