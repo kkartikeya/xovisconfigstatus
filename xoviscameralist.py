@@ -164,6 +164,59 @@ def getCamStatusCompatibilityMode(macaddress):
 
 def getCamStatus(macaddress):
     onpremenabled=onprempushstatus=cloudenabled=cloudcountpushstatus=cloudsensorpushstatus=ntpenabled=ntpstatus='false'
+    getAgentIdsQuery="select macaddress, onpremagentid, cloudcountagentid, cloudsensorstatusagentid from xovis_status where macaddress='%s' " % (macaddress)
+    cursor, conn=connect()
+    cursor.execute(getAgentIdsQuery)
+    rows=cursor.fetchall()
+
+    if len(rows)>0:
+        macaddress=rows[0][0]
+        onpremagentid=rows[0][1]
+        cloudcountagentid=rows[0][2]
+        cloudsensorstatusagentid=rows[0][3]
+
+        try:
+            httprequest=urllib2.Request('http://%s/sensors/%s/api/info/status' % (ipaddress, macaddress))
+            httprequest.add_header("Authorization", "Basic %s" % base64string)
+
+            statusXML = urllib2.urlopen(httprequest, timeout=60).read()
+            try:
+                status = ET.fromstring(statusXML)
+
+                datapushstatus = status.find('{http://www.xovis.com/status}data-push-agents')
+
+                if datapushstatus!=None:
+                    for agentstatus in datapushstatus.findall('{http://www.xovis.com/status}push-agent'):
+                        id=agentstatus.attrib.get('id')
+
+                        if id == onpremagentid:
+                            onpremenabled='true'
+                            lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
+                            lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
+                            onprempushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+
+                        if id == cloudcountagentid || id == cloudsensorstatusagentid:
+                            cloudenabled='true'
+                            if id == cloudcountagentid:
+                                lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
+                                lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
+                                cloudcountpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+                            if id == cloudsensorstatusagentid:
+                                lastsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-successful'))
+                                lastunsuccessfulText=getElementValue(agentstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
+                                cloudsensorpushstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+
+                for ntpstatus in status.findall('{http://www.xovis.com/status}ntp-status'):
+                    ntpenabled=getElementValue(ntpstatus.find('{http://www.xovis.com/status}active'))
+                    lastsuccessfulText=getElementValue(ntpstatus.find('{http://www.xovis.com/status}last-successful'))
+                    lastunsuccessfulText=getElementValue(ntpstatus.find('{http://www.xovis.com/status}last-unsuccessful'))
+                    ntpstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
+            except ET.ParseError:
+                print("parsing exception %s " % macaddress)
+        except urllib2.URLError, e:
+            print("http error %s" % macaddress)
+        except socket.timeout, e:
+            print("http error %s" % macaddress)
 
     return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
 
@@ -182,7 +235,7 @@ def persistToDb( rows ):
     for row in rows:
         serial, group, name, ip, devicetype, swversion, registered, alive, connected = row
 
-        checkCamExist="select macaddress from xovis_status where macaddress = '%s' " % ( serial )
+        checkCamExist="select macaddress from xovis_status where macaddress = '%s' " % (serial)
         cursor.execute( checkCamExist )
         records = cursor.fetchall()
 
