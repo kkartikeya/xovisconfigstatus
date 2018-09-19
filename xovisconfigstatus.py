@@ -20,7 +20,7 @@ def getCamInfo():
 
     cursor, conn = connect()
     cursor.execute( getCamInfoQuery )
-    
+
     rows=cursor.fetchall()
 
     return rows
@@ -54,7 +54,7 @@ def generatehtmlSnippet():
         htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>' % (sensorgroup, sensorname))
 
         htmlSnippet += str('\n<td>%s</td>\n' % (getLastSeenText(lastseen)))
-        htmlSnippet += str('\n<td><a href="/sensors/%s/" target="_blank">%s</a></td>' % (macaddress, macaddress))
+        htmlSnippet += str('\n<td><a href="/sensors/%s/" target="_blank">%s</a></td>' % (macaddress, macaddress.replace('-', ':')))
         htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n<td>%s</td>' % (ipaddress, devicetype, firmware))
 
         if connected:
@@ -68,7 +68,7 @@ def generatehtmlSnippet():
                     htmlSnippet += str('\n<td><img src="resources/images/red_dot.png" alt="Fail" /></td>' )
             else:
                 htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" unchecked /></td>\n<td></td>')
-            
+
             htmlSnippet += str("\n<td>%s</td>\n<td>%s</td>" % (countmode, coordinatemode))
 
             if onpremenabled:
@@ -105,7 +105,7 @@ def createIndexHTML(htmlSnippet):
                 fout.write(line.replace("####XOVIS####", htmlSnippet))
 
     subprocess.call(['chmod', '0755', '/var/www/status/index.html'])
-        
+
 
 def main():
     htmlSnippet = generatehtmlSnippet()
@@ -113,4 +113,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
