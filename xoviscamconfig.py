@@ -13,7 +13,7 @@ DB_USER='xovis'
 DB_PASS='xovis'
 
 # Slack URL
-URL="https://hooks.slack.com/services/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"
+URL="Enter Slack incoming webhook URL"
 
 def sendSlackMessage( message ):
     if message <> '':
@@ -23,7 +23,7 @@ def sendSlackMessage( message ):
         payload = {
             'text': message,
             'username': 'webhookbot',
-            'channel': '#nikerollout',
+            'channel': '#slackchannel',
         }
 #   requests.post(URL, data=json.dumps(payload), headers=headers)
 
@@ -78,10 +78,18 @@ def getCamConfig(ipaddress, username, password):
         try:
             configXML = urllib2.urlopen(httprequest, timeout=60).read()
             config = ET.fromstring(configXML)
+
+            onpremagentid=cloudcountagentid=cloudsensorstatusagentid=-1
+
+            #Get timezone from the config
             timezone=config.find('sensor').find('timezone').text
+
+            #Get Count Mode from the globel config setting, for older version of xovis, the count mode was saved per camera basisself.
+            #on the newer version, the count mode is saved as a per count line.
             globalcountmode=config.find('analytics').find('settings').find('cntmode').text
             coordinatemode=config.find('analytics').find('settings').find('coordinatemode').text
 
+            #Get the count mode from the count line and always assuming there will be only one count line.
             try:
                 countlinecountmode=config.find('analytics').find('counting').find('cntline').attrib.get('count-mode')
                 if countlinecountmode != None:
@@ -92,11 +100,31 @@ def getCamConfig(ipaddress, username, password):
             if globalcountmode <> 'LATE':
                 sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
 
-            cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, configXML, macaddress))
+            agents = config.find('datapush')
+            if agents!=None:
+                for agent in agents.findall('agent'):
+                    connector=agent.find('connector')
+                    if connector!=None:
+                        urlobject=connector.find('url')
+                        if urlobject!=None:
+                            url=urlobject.text
+                            if "datafeed" in url:
+                                onpremagentid=agent.attrib.get('id')
+
+                            if "retailops" in url:
+                                type=agent.attrib.get('type')
+                                id=agent.attrib.get('id')
+                                if "countdata" in type:
+                                    cloudcountagentid=id
+
+                                if "status" in type:
+                                    cloudsensorstatusagentid=id
+
+            cursor.execute( "update xovis_status set timezone=%s, countmode=%s, coordinatemode=%s, onpremagentid=%s, cloudcountagentid=%s, cloudsensorstatusagentid=%s, config=%s where macaddress=%s", (timezone, globalcountmode, coordinatemode, onpremagentid, cloudcountagentid, cloudsensorstatusagentid, configXML, macaddress))
         except socket.timeout:
             print('Socket Timeout exception for %s' % macaddress)
         except ET.ParseError as err:
-            print('Parsing Error')
+            print('Parsing Error for %s' % macaddress)
 
     commit(conn)
     cursor.close()
