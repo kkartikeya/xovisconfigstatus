@@ -6,24 +6,54 @@ import datetime
 DB_HOST='localhost'
 DB_NAME='xovis'
 DB_USER='xovis'
-DB_PASS='xovis'
+DB_PASS='networks'
 
 def connect():
   conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
   cursor = conn.cursor()
   return cursor, conn
 
+def pullSensorHierarchy():
+    assetQuery = 'select asset_id, parent_id from ibex.asset'
+    cursor, conn = connect()
+    cursor.execute(assetQuery)
+    result=cursor.fetchall()
+
+    assetInfo = {}
+    for row in result:
+        asset_id, parent_id = row
+        assetInfo[asset_id] = parent_id
+
+    categoryQuery = 'select category_id, parent_id, name from ibex.category'
+    cursor.execute(categoryQuery)
+    result=cursor.fetchall()
+
+    categoryInfo = {}
+    for row in result:
+        category_id, parent_id, name = row
+        categoryInfo[category_id] = (parent_id, name)
+
+    return assetInfo, categoryInfo
+
 def getCamInfo():
-    getCamInfoQuery='select macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, ' \
-                    'registered, alive, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, '\
+    getCamInfoQuery='select sensor_id, macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, ' \
+                    'connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, '\
                     'cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus from xovis_status order by sensorgroup asc, sensorname asc, ipaddress asc, lastseen desc'
 
     cursor, conn = connect()
     cursor.execute( getCamInfoQuery )
-
     rows=cursor.fetchall()
-
     return rows
+
+def getParents( sensor_id, assetInfo, categoryInfo):
+    parent_id = assetInfo[sensor_id]
+
+    chain = []
+    while parent_id!=None:
+        parent_id, name = categoryInfo[parent_id]
+        chain.append(name)
+
+    return reversed(chain)
 
 epoch = datetime.datetime.utcfromtimestamp(0)
 
@@ -39,22 +69,26 @@ def getLastSeenText(lastseen):
     when=currenttime-lastseen
     return str(when/1000)+' secs ago'
 
-def generatehtmlSnippet():
+def generatehtmlSnippet(assetInfo, categoryInfo):
     htmlSnippet = ""
 
     rows=getCamInfo()
     for row in rows:
-        macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, registered, alive, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = row
+        sensor_id, macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = row
 
-        if alive:
+        parents = getParents( sensor_id, assetInfo, categoryInfo )
+
+        if connected:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/green_dot.png" alt="Connected" /></td>' )
         else:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/red_dot.png" alt="Not Connected" /></td>' )
 
-        htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>' % (sensorgroup, sensorname))
+        htmlSnippet += str('\n<td>%s</td>\n' % (" > ".join(parents)))
+
+        htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n' % (sensorgroup, sensorname))
 
         htmlSnippet += str('\n<td>%s</td>\n' % (getLastSeenText(lastseen)))
-        htmlSnippet += str('\n<td><a href="/sensors/%s/" target="_blank">%s</a></td>' % (macaddress, macaddress.replace('-', ':')))
+        htmlSnippet += str('\n<td><a href="/api/v1/devices/%s/access" target="_blank">%s</a></td>' % (macaddress, macaddress))
         htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n<td>%s</td>' % (ipaddress, devicetype, firmware))
 
         if connected:
@@ -93,9 +127,9 @@ def generatehtmlSnippet():
                 else:
                     htmlSnippet += str('\n<td><img src="resources/images/red_dot.png" alt="Fail" /></td>' )
             else:
-                htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" unchecked /></td>\n<td></td>\n<td></td>\n</tr>')
+                htmlSnippet += str('\n<td><input type="checkbox" disabled="disabled" unchecked /></td>\n<td></td>\n<td></td>\n</tr>\n')
         else:
-            htmlSnippet += str('\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n</tr>')
+            htmlSnippet += str('\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n<td></td>\n</tr>\n')
     return htmlSnippet
 
 def createIndexHTML(htmlSnippet):
@@ -108,7 +142,8 @@ def createIndexHTML(htmlSnippet):
 
 
 def main():
-    htmlSnippet = generatehtmlSnippet()
+    assetInfo, categoryInfo = pullSensorHierarchy()
+    htmlSnippet = generatehtmlSnippet(assetInfo, categoryInfo)
     createIndexHTML(htmlSnippet)
 
 if __name__ == "__main__":

@@ -1,12 +1,11 @@
 
-create role xovis with login password 'xovis' ;
+create schema xovis;
 
-create database xovis with owner xovis ;
+alter schema xovis owner to xovis ;
 
-\c xovis xovis
-
-create table xovis_status (
-	macaddress character varying(18) NOT NULL,
+create table xovis.xovis_status (
+	sensor_id character varying(36) NOT NULL,
+	macaddress character varying(18),
 	sensorgroup character varying(256),
 	sensorname character varying(256),
 	lastseen bigint,
@@ -14,8 +13,6 @@ create table xovis_status (
 	timezone character varying(36),
 	devicetype character varying(10),
 	firmware character varying(32),
-	registered boolean,
-	alive boolean,
 	connected boolean,
 	countmode character varying(15),
 	coordinatemode character varying(10),
@@ -32,4 +29,5 @@ create table xovis_status (
 	config character varying(16384)
 );
 
-alter table only xovis_status add constraint xovis_status_pkey PRIMARY KEY (macaddress);
+alter table only xovis.xovis_status add constraint xovis_status_pkey PRIMARY KEY (sensor_id);
+alter table xovis.xovis_status owner to xovis;
