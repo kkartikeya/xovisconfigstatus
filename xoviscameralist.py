@@ -30,18 +30,9 @@ def parseProperties(propertiesFile):
 username, password, ipaddress = parseProperties("/opt/xovis/status/xovis_ibex.properties")
 base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
 
-epoch = datetime.datetime.utcfromtimestamp(0)
-
-def unix_time_millis(dt):
-    return (dt - epoch).total_seconds() * 1000
-
-def current_time_millis():
-    current = datetime.datetime.utcnow()
-    return int(unix_time_millis( current ))
-
 def date_to_epoch(dt):
     if dt <> None:
-        return time.mktime(time.strptime(dt.strftime('%Y-%m-%d %H:%M:%S.%f'), "%Y-%m-%d %H:%M:%S.%f"))
+        return time.mktime(time.strptime(dt.strftime('%Y-%m-%d %H:%M:%S.%f'), "%Y-%m-%d %H:%M:%S.%f")) * 1000
     else:
         return 0
 

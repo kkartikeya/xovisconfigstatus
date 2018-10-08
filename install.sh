@@ -8,6 +8,8 @@ pip install --upgrade pip
 
 # Install python postgres package
 /usr/local/bin/pip install psycopg2
+/usr/local/bin/pip install python-dateutil
+/usr/local/bin/pip install requests
 
 # Create /var/www/status directory
 mkdir -p /var/www/status
