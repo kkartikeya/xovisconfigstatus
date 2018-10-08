@@ -1,6 +1,7 @@
 import psycopg2
 import subprocess
 import datetime
+import ConfigParser
 
 # Xovis Database Info
 DB_HOST='localhost'
