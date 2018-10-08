@@ -46,12 +46,14 @@ def getCamInfo():
     return rows
 
 def getParents( sensor_id, assetInfo, categoryInfo):
-    parent_id = assetInfo[sensor_id]
+    self_id = assetInfo[sensor_id]
+    parent_id, name = categoryInfo[self_id]
 
     chain = []
     while parent_id!=None:
         parent_id, name = categoryInfo[parent_id]
-        chain.append(name)
+        if parent_id <> None:
+            chain.append(name)
 
     return reversed(chain)
 
@@ -69,21 +71,47 @@ def getLastSeenText(lastseen):
     when=currenttime-lastseen
     return str(when/1000)+' secs ago'
 
-def generatehtmlSnippet(assetInfo, categoryInfo):
-    htmlSnippet = ""
-
+def getSortedRows(assetInfo, categoryInfo):
     rows=getCamInfo()
+    tempTableQuery = 'create temp table sensorlist(parents character varying(256), macaddress character varying(18), sensorgroup character varying(256), sensorname character varying(256), lastseen bigint, \
+                                     ipaddress character varying(15), timezone character varying(36), devicetype character varying(10), firmware character varying(32), \
+                                     connected boolean, countmode character varying(15), coordinatemode character varying(10), onpremenabled boolean, onprempushstatus boolean, \
+                                     cloudenabled boolean, cloudcountpushstatus boolean, cloudsensorpushstatus boolean, ntpenabled boolean, \
+                                     ntpstatus boolean)'
+    cursor, conn = connect()
+    cursor.execute( tempTableQuery )
+
     for row in rows:
         sensor_id, macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = row
-
         parents = getParents( sensor_id, assetInfo, categoryInfo )
+        cursor.execute("insert into sensorList values( %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" , (" > ".join(parents), macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus))
+
+    getCamInfoQuery='select parents, macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, ' \
+                        'connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, '\
+                        'cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus from sensorList order by parents asc, sensorgroup asc, sensorname asc, ipaddress asc, lastseen desc'
+
+    cursor.execute(getCamInfoQuery)
+    rows=cursor.fetchall()
+
+    dropTempTableQuery = 'drop table sensorList'
+    cursor.execute(dropTempTableQuery)
+    cursor.close()
+    conn.close()
+    return rows
+
+def generatehtmlSnippet(assetInfo, categoryInfo):
+    htmlSnippet = ""
+    rows = getSortedRows(assetInfo, categoryInfo)
+
+    for row in rows:
+        parents, macaddress, sensorgroup, sensorname, lastseen, ipaddress, timezone, devicetype, firmware, connected, countmode, coordinatemode, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = row
 
         if connected:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/green_dot.png" alt="Connected" /></td>' )
         else:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/red_dot.png" alt="Not Connected" /></td>' )
 
-        htmlSnippet += str('\n<td>%s</td>\n' % (" > ".join(parents)))
+        htmlSnippet += str('\n<td>%s</td>\n' % (parents))
 
         htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n' % (sensorgroup, sensorname))
 
