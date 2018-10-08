@@ -8,6 +8,15 @@ DB_NAME='xovis'
 DB_USER='xovis'
 DB_PASS='networks'
 
+def parseProperties(propertiesFile):
+    config = ConfigParser.RawConfigParser()
+    config.read( propertiesFile )
+
+    wanip = config.get('login', 'webgui.wan.ip')
+
+    return wanip
+
+wanip= parseProperties("/opt/xovis/status/xovis_ibex.properties")
 def connect():
   conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
   cursor = conn.cursor()
@@ -111,12 +120,12 @@ def generatehtmlSnippet(assetInfo, categoryInfo):
         else:
             htmlSnippet += str('\n<tr>\n<td><img src="resources/images/red_dot.png" alt="Not Connected" /></td>' )
 
-        htmlSnippet += str('\n<td>%s</td>\n' % (parents))
+        htmlSnippet += str('\n<td>%s</td>' % (parents))
 
-        htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n' % (sensorgroup, sensorname))
+        htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>' % (sensorgroup, sensorname))
 
-        htmlSnippet += str('\n<td>%s</td>\n' % (getLastSeenText(lastseen)))
-        htmlSnippet += str('\n<td><a href="/api/v1/devices/%s/access" target="_blank">%s</a></td>' % (macaddress, macaddress))
+        htmlSnippet += str('\n<td>%s</td>' % (getLastSeenText(lastseen)))
+        htmlSnippet += str('\n<td><a href="https://%s/api/v1/devices/%s/access" target="_blank">%s</a></td>' % (wanip, macaddress, macaddress))
         htmlSnippet += str('\n<td>%s</td>\n<td>%s</td>\n<td>%s</td>' % (ipaddress, devicetype, firmware))
 
         if connected:
