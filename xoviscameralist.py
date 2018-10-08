@@ -74,10 +74,11 @@ def persistToDb( sensorList, sensorStates ):
                            %s, %s, %s, %s, %s, %s, %s) " , ( sensor_id, macaddress, group, name, curr, ip, devicetype, swversion, connected, onpremenabled, onprempushstatus, \
                             cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus ) )
         else:
-            cursor.execute( "update xovis.xovis_status set sensorgroup = %s, sensorname = %s, lastseen = %s, ipaddress = %s, devicetype = %s, firmware = %s, connected = %s, \
-                           onpremenabled = %s, onprempushstatus = %s, cloudenabled = %s, cloudcountpushstatus = %s, cloudsensorpushstatus = %s, ntpenabled = %s, ntpstatus = %s \
-                           where sensor_id = %s " , ( group, name, curr, ip, devicetype, swversion, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, \
-                           cloudsensorpushstatus, ntpenabled, ntpstatus, sensor_id ) )
+            if connected:
+                cursor.execute( "update xovis.xovis_status set sensorgroup = %s, sensorname = %s, lastseen = %s, ipaddress = %s, devicetype = %s, firmware = %s, connected = %s, \
+                                onpremenabled = %s, onprempushstatus = %s, cloudenabled = %s, cloudcountpushstatus = %s, cloudsensorpushstatus = %s, ntpenabled = %s, ntpstatus = %s \
+                                where sensor_id = %s " , ( group, name, curr, ip, devicetype, swversion, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, \
+                                cloudsensorpushstatus, ntpenabled, ntpstatus, sensor_id ) )
 
     commit( conn )
     cursor.close();

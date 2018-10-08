@@ -53,7 +53,7 @@ def getCamConfig(ipaddress, username, password):
     cursor, conn = connect()
     base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
 
-    getCamListQuery="select macaddress, sensorgroup, sensorname from xovis.xovis_status "
+    getCamListQuery="select macaddress from xovis.xovis_status where connected = true"
     cursor.execute( getCamListQuery )
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
