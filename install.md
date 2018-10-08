@@ -24,9 +24,9 @@ chmod -R 755 /var/www/status
 crontab -l > mycron
 
 # Add config status to the crontab dump file
-echo "0,15,30,45 * * * * cd /opt/xovisconfigstatus; python xoviscameralist.py" >> mycron
-echo "6,21,36,51 * * * * cd /opt/xovisconfigstatus; python xoviscamconfig.py" >> mycron
-echo "*/5 * * * * cd /opt/xovisconfigstatus; python xovisconfigstatus.py" >> mycron
+echo "0 03,06,09,12,15,18,21 * * * cd /opt/xovisconfigstatus; python xoviscameralist.py" >> mycron
+echo "30 01,04,07,10,13,16,19,22 * * * cd /opt/xovisconfigstatus; python xoviscamconfig.py" >> mycron
+echo "*/30 * * * * cd /opt/xovisconfigstatus; python xovisconfigstatus.py" >> mycron
 
 # Add the entire crontab back
 crontab mycron
