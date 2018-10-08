@@ -88,8 +88,8 @@ def getCamConfig(ipaddress, username, password):
             except AttributeError:
                 print("Older Version or Slave Camera")
 
-            if globalcountmode <> 'LATE':
-                sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
+#            if globalcountmode <> 'LATE':
+#                sendSlackMessage( 'Camera: %s for Store: %s is not set to LATE mode.' % ( row[2], row[1] ))
 
             agents = config.find('datapush')
             if agents!=None:
