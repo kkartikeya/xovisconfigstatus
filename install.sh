@@ -33,7 +33,8 @@ crontab mycron
 rm -rf mycron
 
 # Copy the Apache configuration file to /etc/httpd/conf.d/
-cp 1_status.conf /etc/httpd/conf.d/
+#cp 1_status.conf /etc/httpd/conf.d/
+cp 1_status.conf /etc/apache2/sites-enabled/
 
 mkdir -p /opt/xovis/status/
 cp xovis_ibex.properties /opt/xovis/status/
@@ -43,4 +44,5 @@ passwd=`cat /opt/xovis/status/xovis_ibex.properties | grep 'webgui.passwd' | cut
 /usr/bin/htpasswd -cdb /var/www/status/.htpasswd ${user} ${passwd}
 
 # Restart the Apache Web Server
-/sbin/service httpd restart
+#/sbin/service httpd restart
+/usr/sbin/service apache2 restart
