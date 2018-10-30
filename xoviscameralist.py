@@ -1,53 +1,40 @@
 import urllib2, base64
-import xml.etree.ElementTree as ET
 import ConfigParser
 import csv
 import datetime
+import time
 import argparse
 import psycopg2
 import dateutil.parser as dateparser
 import socket
+import ssl
+import xml.etree.ElementTree as ET
+import json
 
 # Xovis Database Info
 DB_HOST='localhost'
 DB_NAME='xovis'
 DB_USER='xovis'
-DB_PASS='xovis'
-
-class FakeSecHead(object):
-    def __init__(self, fp):
-        self.fp = fp
-        self.sechead = '[asection]\n'
-
-    def readline(self):
-        if self.sechead:
-            try:
-                return self.sechead
-            finally:
-                self.sechead = None
-        else:
-            return self.fp.readline()
+DB_PASS='networks'
 
 def parseProperties(propertiesFile):
-    config = ConfigParser.SafeConfigParser()
-    config.readfp( FakeSecHead(open(propertiesFile )))
+    config = ConfigParser.RawConfigParser()
+    config.read( propertiesFile )
 
-    username = config.get("asection", "webgui.user")
-    password = config.get("asection", "webgui.passwd")
+    username = config.get('login', 'webgui.user')
+    password = config.get('login', 'webgui.passwd')
+    ipaddress = config.get('login', 'webgui.ip')
 
-    return username, password
+    return username, password, ipaddress
 
-username, password = parseProperties("/opt/xovis/xovis_remote_manager.properties")
-ipaddress = 'localhost'
+username, password, ipaddress = parseProperties("/opt/xovis/status/xovis_ibex.properties")
 base64string = base64.encodestring('%s:%s' %(username, password)).replace('\n', '')
-epoch = datetime.datetime.utcfromtimestamp(0)
 
-def unix_time_millis(dt):
-    return (dt - epoch).total_seconds() * 1000
-
-def current_time_millis():
-    current = datetime.datetime.utcnow()
-    return int(unix_time_millis( current ))
+def date_to_epoch(dt):
+    if dt <> None:
+        return time.mktime(time.strptime(dt.strftime('%Y-%m-%d %H:%M:%S.%f'), "%Y-%m-%d %H:%M:%S.%f")) * 1000
+    else:
+        return 0
 
 def connect():
   conn = psycopg2.connect("dbname = %s host = %s user = %s password = %s" % (DB_NAME, DB_HOST, DB_USER, DB_PASS) )
@@ -60,30 +47,41 @@ def commit( conn ):
 def rollback():
     conn.rollback();
 
-def fetchSensorsXML(ipaddress, username, password):
+def getSensorList():
     ''' Get the Sensor List '''
-    request = urllib2.Request("http://%s/sensors" % (ipaddress))
-    request.add_header("Authorization", "Basic %s" % base64string)
-    sensorsXML = urllib2.urlopen(request, timeout=60).read()
+    cursor, conn=connect()
+    cursor.execute('select sensorasset_id, sensorgroup, name, ip, serial, devicetype, version, lastconnected from ibex.sensorasset')
+    rows = cursor.fetchall()
 
-    return sensorsXML
-
-def parseSensorsXML(sensorsXML):
-    rows = []
-    xmlRoot = ET.fromstring(sensorsXML)
-    for child in xmlRoot:
-        if child.tag == 'sensor':
-            serial = child.find('serial').text
-            ip = child.find('ip').text
-            group = child.find('group').text
-            name = child.find('name').text
-            devicetype = child.find('device-type').text
-            swversion = child.find('sw-version').text
-            registered = child.find('registered').text
-            alive = child.find('alive').text
-            connected = child.find('connected').text
-            rows.append([serial, group, name, ip, devicetype, swversion, registered, alive, connected])
     return rows
+
+def persistToDb( sensorList, sensorStates ):
+    cursor, conn = connect()
+
+    for sensor in sensorList:
+        sensor_id, group, name, ip, macaddress, devicetype, swversion, lastconnected = sensor
+        connected = getSensorState(macaddress, sensorStates)
+
+        checkCamExist="select macaddress from xovis.xovis_status where macaddress = '%s' " % (macaddress)
+        cursor.execute( checkCamExist )
+        records = cursor.fetchall()
+        curr=date_to_epoch(lastconnected)
+
+        onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatusByVersion(macaddress,swversion)
+        if not records:
+            cursor.execute( "insert into xovis.xovis_status(sensor_id, macaddress, sensorgroup, sensorname, lastseen, ipaddress, devicetype, firmware, connected, onpremenabled, \
+                           onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, \
+                           %s, %s, %s, %s, %s, %s, %s) " , ( sensor_id, macaddress, group, name, curr, ip, devicetype, swversion, connected, onpremenabled, onprempushstatus, \
+                            cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus ) )
+        else:
+            if connected:
+                cursor.execute( "update xovis.xovis_status set sensorgroup = %s, sensorname = %s, lastseen = %s, ipaddress = %s, devicetype = %s, firmware = %s, connected = %s, \
+                                onpremenabled = %s, onprempushstatus = %s, cloudenabled = %s, cloudcountpushstatus = %s, cloudsensorpushstatus = %s, ntpenabled = %s, ntpstatus = %s \
+                                where sensor_id = %s " , ( group, name, curr, ip, devicetype, swversion, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, \
+                                cloudsensorpushstatus, ntpenabled, ntpstatus, sensor_id ) )
+
+    commit( conn )
+    cursor.close();
 
 def getElementValue( object ):
     if object is not None:
@@ -116,12 +114,15 @@ def getStatus( lastsuccessfulText, lastunsuccessfulText):
 
 def getCamStatusCompatibilityMode(macaddress):
     onpremenabled=onprempushstatus=cloudenabled=cloudcountpushstatus=cloudsensorpushstatus=ntpenabled=ntpstatus='false'
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
 
     try:
-        httprequest=urllib2.Request('http://%s/sensors/%s/api/info/status' % (ipaddress, macaddress))
+        httprequest=urllib2.Request('https://%s/api/v1/devices/%s/access/api/info/status' % (ipaddress, macaddress))
         httprequest.add_header("Authorization", "Basic %s" % base64string)
 
-        statusXML = urllib2.urlopen(httprequest, timeout=60).read()
+        statusXML = urllib2.urlopen(httprequest, timeout=60, context=ctx).read()
         try:
             status = ET.fromstring(statusXML)
 
@@ -155,12 +156,45 @@ def getCamStatusCompatibilityMode(macaddress):
                 ntpstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
         except ET.ParseError:
             print("parsing exception %s " % macaddress)
-    except urllib2.URLError, e:
+    except urllib2.URLError as e:
         print("http error %s" % macaddress)
-    except socket.timeout, e:
+    except socket.timeout as e:
         print("http error %s" % macaddress)
-
+    except ssl.SSLError as e:
+        print("SSL error %s" % macaddress)
     return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
+
+def pullSensorState():
+    try:
+        httprequest = urllib2.Request('https://%s/api/v1/devices' % (ipaddress))
+        httprequest.add_header("Authorization", "Basic %s" % base64string)
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        stateJSON = urllib2.urlopen(httprequest, timeout=60, context=ctx).read()
+
+        rows = {}
+        parsed_json = json.loads(stateJSON)
+        for child in parsed_json:
+            state = child['state']
+            serial = child['serial']
+            rows[serial] =  state
+        return rows
+    except urllib2.URLError as e:
+        print("http error")
+    except socket.timeout as e:
+        print("http error")
+    except ssl.SSLError as e:
+        print("SSL error")
+
+def getSensorState(macaddress, sensorStates):
+#    OK, UNKNOWN, WARNING, ERROR
+    state = sensorStates[macaddress]
+    if (state == 'OK' or state == 'WARNING'):
+        return True
+    else:
+        return False
 
 def getCamStatus(macaddress):
     onpremenabled=onprempushstatus=cloudenabled=cloudcountpushstatus=cloudsensorpushstatus=ntpenabled=ntpstatus='false'
@@ -176,10 +210,13 @@ def getCamStatus(macaddress):
         cloudsensorstatusagentid=rows[0][3]
 
         try:
-            httprequest=urllib2.Request('http://%s/sensors/%s/api/info/status' % (ipaddress, macaddress))
+            httprequest=urllib2.Request('https://%s/api/v1/devices/%s/access/api/info/status' % (ipaddress, macaddress))
             httprequest.add_header("Authorization", "Basic %s" % base64string)
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
 
-            statusXML = urllib2.urlopen(httprequest, timeout=60).read()
+            statusXML = urllib2.urlopen(httprequest, timeout=60, context=ctx).read()
             try:
                 status = ET.fromstring(statusXML)
 
@@ -213,10 +250,12 @@ def getCamStatus(macaddress):
                     ntpstatus=getStatus(lastsuccessfulText, lastunsuccessfulText)
             except ET.ParseError:
                 print("parsing exception %s " % macaddress)
-        except urllib2.URLError, e:
+        except urllib2.URLError as e:
             print("http error %s" % macaddress)
-        except socket.timeout, e:
+        except socket.timeout as e:
             print("http error %s" % macaddress)
+        except ssl.SSLError as e:
+            print("SSL error %s" % macaddress)
 
     return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
 
@@ -228,54 +267,28 @@ def getCamStatusByVersion(macaddress, firmware):
 
     return onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus
 
-def persistToDb( rows ):
-    cursor, conn = connect()
-    curr=current_time_millis()
-
-    for row in rows:
-        serial, group, name, ip, devicetype, swversion, registered, alive, connected = row
-
-        checkCamExist="select macaddress from xovis_status where macaddress = '%s' " % (serial)
-        cursor.execute( checkCamExist )
-        records = cursor.fetchall()
-
-        if alive == 'true':
-            onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus = getCamStatusByVersion(serial,swversion)
-            if not records:
-                cursor.execute( "insert into xovis_status(macaddress, sensorgroup, sensorname, lastseen, ipaddress, devicetype, firmware, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) " , ( serial, group, name, curr, ip, devicetype, swversion, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus ) )
-            else:
-                cursor.execute( "update xovis_status set sensorgroup = %s, sensorname = %s, lastseen = %s, ipaddress = %s, devicetype = %s, firmware = %s, registered = %s, alive = %s, connected = %s, onpremenabled = %s, onprempushstatus = %s, cloudenabled = %s, cloudcountpushstatus = %s, cloudsensorpushstatus = %s, ntpenabled = %s, ntpstatus = %s where macaddress = %s " , ( group, name, curr, ip, devicetype, swversion, registered, alive, connected, onpremenabled, onprempushstatus, cloudenabled, cloudcountpushstatus, cloudsensorpushstatus, ntpenabled, ntpstatus, serial ) )
-        else:
-            if not records:
-                cursor.execute( "insert into xovis_status(macaddress, sensorgroup, sensorname, lastseen, ipaddress, devicetype, firmware, registered, alive, connected) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) " , ( serial, group, name, 0, ip, devicetype, swversion, registered, alive, connected ) )
-            else:
-                cursor.execute( "update xovis_status set sensorgroup = %s, sensorname = %s, ipaddress = %s, devicetype = %s, firmware = %s, registered = %s, alive = %s, connected = %s where macaddress = %s " , ( group, name, ip, devicetype, swversion, registered, alive, connected, serial ) )
-
-    commit( conn )
-    cursor.close();
-
 def persistToCSV( rows, filename ):
     with open(filename, 'wb') as csvfile:
         csvwriter = csv.writer(csvfile, delimiter=',', dialect='excel')
-        csvwriter.writerow(['Serial', 'Sensor Group', 'Sensor Name', 'IP Address', 'Device Type', 'Firmware', 'Registered', 'Alive', 'Connected'])
+        csvwriter.writerow(['Serial', 'Sensor Group', 'Sensor Name', 'IP Address', 'Device Type', 'Firmware', 'Connected'])
 
         for row in rows:
-            serial, group, name, ip, devicetype, swversion, registered, alive, connected = row
-            csvwriter.writerow([serial, group, name, ip, devicetype, swversion, registered, alive, connected])
+            serial, group, name, ip, devicetype, swversion, connected = row
+            csvwriter.writerow([serial, group, name, ip, devicetype, swversion, connected])
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--csvoutput", help="Use this option for CSV output of the sensor list", action="store_true")
     args = parser.parse_args()
 
-    sensorsXML = fetchSensorsXML(ipaddress+':8080', username, password)
+    sensorList = getSensorList()
+    sensorState = pullSensorState()
 
-    rows = parseSensorsXML( sensorsXML )
     if args.csvoutput:
         filename = 'xovis_cameras_'+ipaddress + '_' + datetime.datetime.utcnow().isoformat() + '.csv'
-        persistToCSV( rows, filename )
+        persistToCSV( sensorList, filename )
     else:
-        persistToDb( rows )
+        persistToDb( sensorList, sensorState )
 
 if __name__ == "__main__":
     main()
