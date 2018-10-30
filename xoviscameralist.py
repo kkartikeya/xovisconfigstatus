@@ -187,7 +187,7 @@ def getCamStatus(macaddress):
 
                 if datapushstatus!=None:
                     for agentstatus in datapushstatus.findall('{http://www.xovis.com/status}push-agent'):
-                        id=agentstatus.attrib.get('id')
+                        id=int(agentstatus.attrib.get('id'))
 
                         if id == onpremagentid:
                             onpremenabled='true'
